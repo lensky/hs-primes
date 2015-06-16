@@ -11,13 +11,13 @@ where
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Unboxed.Mutable as MUV
 
-import qualified Data.PQueue.Min as PQM
+import qualified Data.Heap as DH
+
+import Data.Maybe (fromJust)
 
 import Control.Monad.ST (runST)
 
-import Control.Applicative ((<$>))
-
-type SEPQ = (PQM.MinQueue [Int], Int)
+type SEPQ = (DH.MinHeap [Int], Int)
 
 -- | The default wheel size for prime number sieves.
 wheelSize :: Int
@@ -28,16 +28,16 @@ getNextC = snd
 
 insertPrime :: SEPQ -> Int -> SEPQ
 insertPrime (pq,c) p = if p2 > c
-                          then (PQM.insert p2l pq, c)
-                          else let (cl,pq') = PQM.deleteFindMin pq
-                               in (PQM.insert (tail cl) $ PQM.insert p2l pq', p2)
+                          then (DH.insert p2l pq, c)
+                          else let (cl,pq') = fromJust $ DH.view pq
+                               in (DH.insert (tail cl) $ DH.insert p2l pq', p2)
   where p2 = p*p
         p2l = [p2,p2+2*p..]
 
 nextMin :: SEPQ -> SEPQ
-nextMin sepq@(pq,_) = case PQM.minView pq of
-                          Just (ml,pq') -> let pq'' = PQM.insert (tail ml) pq'
-                                           in (pq'', head $ PQM.findMin pq'')
+nextMin sepq@(pq,_) = case DH.view pq of
+                          Just (ml,pq') -> let pq'' = DH.insert (tail ml) pq'
+                                           in (pq'', head $ fromJust $ DH.viewHead pq'')
                           Nothing -> sepq
 
 -- | Infinite list of prime numbers.
@@ -46,7 +46,7 @@ primes' :: Int -- ^ sieve wheel size
 primes' nw = reverse ps ++ start:sieve initSepq iws (start + iw)
   where (start, iw:iws, ps) = wheelFromPrimes nw
         initSepq = let s2 = start * start
-                   in (PQM.insert [s2,s2+2*start..] PQM.empty, s2)
+                   in (DH.insert [s2,s2+2*start..] DH.empty, s2)
         sieve sepq (w:ws) i = case compare (getNextC sepq) i of
                                 GT -> let sepq' = insertPrime sepq i
                                       in i : sieve sepq' ws (i+w)
